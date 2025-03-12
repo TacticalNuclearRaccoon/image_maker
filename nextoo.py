@@ -930,8 +930,6 @@ campaign = st.text_input('Enter campaign id')
 answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
 
-sector = st.selectbox('Select sector', ('retail', 'it', 'jobs', 'sante'))
-
 st.header("Vision Globale")
 
 everyone = augmented_map_dysfunctions(answers_url, api_url)
@@ -984,73 +982,8 @@ if single == False:
     plt.tight_layout()
     st.write(f"Il y a un écart dans {ecart}% des réponses aux questions. Ainsi, l'équipe est en phase à {agree}%")
     st.pyplot(ecart_fig)
-    ecart_fig.savefig(f'{results_folder}/{client_name}_ecart_figure.png', dpi=100, 
-                      bbox_inches='tight', pad_inches=0)
-    ecart_team_page1(assets, results_folder, client_name, agree, ecart)
-    ecart_team_page2(assets, results_folder, client_name)
-    merger([f'{results_folder}/{client_name}_ecart_reponses1.pdf', f'{results_folder}/{client_name}_ecart_reponses2.pdf'], client_name, results_folder, "ecart")
-    with open(f'{results_folder}/{client_name}_ecart.pdf', "rb") as file:
-        btn = st.download_button(
-            label="Download ecart réponses page",
-            data=file,
-            file_name=f"{client_name}_ecart_reponses.pdf'")
 else:
     st.write("Une seule personne a répondu, les cas en marge ne sont pas disponibles")
-
-st.header(f"Positionnement dans le secteur d'activité {sector}")
-
-all_dysfunctions = dysfunction_frequencies(answers_url, api_url)
-if all_dysfunctions.shape[0] < 5:
-    df = all_dysfunctions
-else:
-    df = all_dysfunctions.head(5)
-
-final = sector_rank_augmented(assets, answers_url, api_url, df, sector, thematics)
-# create sector rank gauge figures
-for i in range(df.shape[0]):
-    dys = final['dysfunction'].iloc[i]
-    dys_rank = final.loc[(final['dysfunction']==f"{dys}"),'rank_vous'].values
-    dys_comp_rank = final.loc[(final['dysfunction']==f"{dys}"),'rank_secteur'].values
-    fig = go.Figure(go.Indicator(
-    mode = "gauge",      
-    value = int(dys_rank),
-    domain = {'x': [0, 1], 'y': [0, 1]},
-    title = {'text': '-\t\t\t\t\t\t\t\tImpact\t\t\t\t\t\t\t\t+', 'font': {'size': 60}, "align":"center"},
-    #delta = {'reference': int(dys1_comp_rank), f'{delta_values[0]}': {'color': "RebeccaPurple"}},
-    gauge = {
-        'axis': {'visible': False},
-        'bar': {'color': "midnightblue"},
-        'bgcolor': "white",
-        'borderwidth': 2,
-        'bordercolor': "gray",
-        'steps': [
-            {'range': [0, int(dys_comp_rank)], 'color': 'orangered'}],
-            'threshold': {
-            'line': {'color': "white", 'width': 4},
-            'thickness': 0.75,
-            'value': 490}}))
-        
-    fig.update_layout(paper_bgcolor = 'rgba(0,0,0,0)', font = {'color': "midnightblue", 'family': "Arial"})
-    fig.write_image(f'{results_folder}/{client_name}_dys{i}_raw.png', width=1400, height=1000)
-# prepare sector rank dataframe to be input in the sector page creating function (adding points forts et faibles)
-final_to_page = final.drop(columns=['description', 'weight'])
-final_to_page['point forts'] = np.where(final_to_page['rank_secteur']>final_to_page['rank_vous'], True, False)
-final_to_page['point faibles'] = np.where(final_to_page['rank_secteur']<final_to_page['rank_vous'], True, False)
-# creating list of points forts/faibles
-points_forts = []
-points_faibles = []
-for i in range(final_to_page.shape[0]):
-    if final_to_page['point forts'].iloc[i] == True:
-        points_forts.append(final_to_page['dysfunction'].iloc[i])
-    elif final_to_page['point faibles'].iloc[i] == True:
-        points_faibles.append(final_to_page['dysfunction'].iloc[i])
-# create pdf page
-sector_rank_page(assets, final, results_folder, client_name, points_forts, points_faibles)
-with open(f'{results_folder}/{client_name}_ranks.pdf', "rb") as file:
-    btn = st.download_button(
-        label="Download sector ranking page",
-        data=file,
-        file_name=f"{client_name}_ranks.pdf")
 
 st.header("Les cas en marge")
 if single == False:
@@ -1075,17 +1008,3 @@ filtered_solutions = selection['selected_rows']
 st.write("selected solutions")
 st.dataframe(data=filtered_solutions)
 
-make_solutions = st.button("create solutions page")
-if make_solutions:
-    solutions_page_logo(assets, filtered_solutions, results_folder, client_name)
-    # create solutions page 2
-    try:
-        solutions_page_logo2(assets, filtered_solutions, results_folder, client_name)
-    except:
-        pass
-    merger([f'{results_folder}/{client_name}_solutions_page1.pdf', f'{results_folder}/{client_name}_solutions_page2.pdf'], client_name, results_folder, "solutions")
-    with open(f'{results_folder}/{client_name}_solutions.pdf', "rb") as file:
-        st.download_button(
-            label="Download solutions",
-            data=file,
-            file_name=f"{client_name}_solutions.pdf")
