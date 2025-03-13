@@ -60,12 +60,74 @@ def aggrid_interactive_table(df: pd.DataFrame):
     return selection
 
 
+# Most serious dysfunctions
+def most_serious(answers_url, api_url):
+    answers = requests.get(answers_url)
+    answers.raise_for_status()
+    all_data = answers.json()
+
+    response = requests.get(api_url)
+    response.cookies.clear()
+    themes_and_planets_data = response.json()
+
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+
+    all_data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
+
+    # Create a mapping of dysfunction labels to explanations
+    dysfunction_explanations = {
+        dysfunction["label"]: dysfunction.get("explanation", "")
+        for family in themes_and_planets_data.get("families", [])
+        for dysfunction in family.get("dysfunctions", [])
+    }
+
+    # Dictionary to store dysfunction weight sums and counts
+    dysfunction_scores = defaultdict(lambda: {"weight_sum": 0, "count": 0})
+
+    # Process each user's response
+    for response in all_data:
+        for answer in response["answers"]:
+            for family in themes_and_planets_data.get("families", []):
+                for dysfunction in family.get("dysfunctions", []):
+                    for question in dysfunction.get("questions", []):
+                        if answer["questionId"] == question["id"] and answer["answer"] in question["responseTrigger"]:
+                            dysfunction_scores[dysfunction["label"]]["weight_sum"] += dysfunction.get("weight", 0)
+                            dysfunction_scores[dysfunction["label"]]["count"] += 1  # Count occurrences
+
+    # Convert dysfunction scores to a DataFrame
+    df = pd.DataFrame([
+        {
+            "dysfunction": label,
+            "description": dysfunction_explanations.get(label, "No description available"),
+            "weight": (data["weight_sum"] / data["count"]) if data["count"] > 0 else 0,  # Normalize by occurrences
+            "people detected": data["count"]
+        }
+        for label, data in dysfunction_scores.items()
+    ])
+
+    # Sort dysfunctions by highest average weight and return the top 5
+    df = df.sort_values(by="weight", ascending=False).head(5).reset_index(drop=True)
+
+    return df
+
 # Vision Globale
 def augmented_map_dysfunctions(answers_url, api_url):
-    answers = requests.get(answers_url).json()
-    data = [item for item in answers]
+    response = requests.get(answers_url)
+    response.raise_for_status()
+    all_data = response.json()
+
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+
+    data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
     
-    themes_and_planets_data = requests.get(api_url).json()
+    # Fetch themes and planets data
+    response = requests.get(api_url)
+    response.raise_for_status()
+    response.cookies.clear()
+    themes_and_planets_data = response.json()
+    
     dfs = []
     empty_response_ids = []  # List to track response IDs with empty DataFrames
     
@@ -206,48 +268,88 @@ def team_gap(answers_url, api_url):
 
 # Top 5 dysfunctions
 def dysfunction_frequencies(answers_url, api_url):
-    answers = requests.get(answers_url)
-    answers.raise_for_status()
-    all_data = answers.json()
+    # Fetch the responses from the answers API
+    response = requests.get(answers_url)
+    response.raise_for_status()
+    all_data = response.json()
 
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+
+    data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
+
+    # Fetch themes and planets data
     response = requests.get(api_url)
+    response.raise_for_status()
     response.cookies.clear()
     themes_and_planets_data = response.json()
 
-    # Create a mapping of dysfunction labels to explanations
-    dysfunction_explanations = {
-        dysfunction["label"]: dysfunction.get("explanation", "")
-        for family in themes_and_planets_data.get("families", [])
-        for dysfunction in family.get("dysfunctions", [])
-    }
+    # Create a dictionary to map dysfunction labels to their explanations
+    dysfunction_explanations = {}
+    for family in themes_and_planets_data.get('families', []):
+        for dysfunction in family.get('dysfunctions', []):
+            dysfunction_label = dysfunction.get('label', 'Unknown Dysfunction')
+            dysfunction_explanations[dysfunction_label] = dysfunction.get('explanation', '')
 
-    # Dictionary to store dysfunction weight sums and counts
-    dysfunction_scores = defaultdict(lambda: {"weight_sum": 0, "count": 0})
+    # List to store DataFrames for each response
+    dfs = []
 
     # Process each user's response
-    for response in all_data:
-        for answer in response["answers"]:
-            for family in themes_and_planets_data.get("families", []):
-                for dysfunction in family.get("dysfunctions", []):
-                    for question in dysfunction.get("questions", []):
-                        if answer["questionId"] == question["id"] and answer["answer"] in question["responseTrigger"]:
-                            dysfunction_scores[dysfunction["label"]]["weight_sum"] += dysfunction.get("weight", 0)
-                            dysfunction_scores[dysfunction["label"]]["count"] += 1  # Count occurrences
+    for response in data:
+        answers = response['answers']
+        response_id = response['id']
+        results = []
 
-    # Convert dysfunction scores to a DataFrame
-    df = pd.DataFrame([
-        {
-            "dysfunction": label,
-            "description": dysfunction_explanations.get(label, "No description available"),
-            "weight": (data["weight_sum"] / data["count"]) if data["count"] > 0 else 0  # Normalize by occurrences
-        }
-        for label, data in dysfunction_scores.items()
-    ])
+        # Iterate over each family and dysfunction
+        for family in themes_and_planets_data.get('families', []):
+            for dysfunction in family.get('dysfunctions', []):
+                for question in dysfunction.get('questions', []):
+                    question_id = question['id']
+                    matching_answer = next((item for item in answers if item['questionId'] == question_id), None)
 
-    # Sort dysfunctions by highest average weight and return the top 5
-    df = df.sort_values(by="weight", ascending=False).head(5).reset_index(drop=True)
+                    if matching_answer:
+                        user_answer = matching_answer['answer']
+                        if user_answer in question.get('responseTrigger', []):
+                            results.append({
+                                'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
+                                'weight': dysfunction.get('weight', 0),
+                                'family': family.get('title', 'Unknown Family'),
+                                'explanation': dysfunction.get('explanation', '')  # Fallback from API
+                            })
 
-    return df
+        # Create a DataFrame for the current response
+        df = pd.DataFrame(results)
+        if not df.empty:
+            df.drop_duplicates(subset=['dysfunction'], inplace=True)
+            df.rename(columns={'weight': response_id}, inplace=True)
+            dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame(columns=['dysfunction', 'description', 'av_weight'])
+
+    # Merge all DataFrames on the 'dysfunction' column
+    for i, df in enumerate(dfs):
+        df.rename(columns={col: f"{col}_{i}" for col in df.columns if col != "dysfunction"}, inplace=True)
+
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on="dysfunction", how="outer"), dfs)
+    
+    data_merge.fillna(0, inplace=True)
+
+    # Calculate average weight
+    numeric_cols = data_merge.select_dtypes(include=np.number).columns
+    data_merge['av_weight'] = data_merge[numeric_cols].mean(axis=1)
+
+    # Add explanations from the dictionary if they are missing
+    data_merge['description'] = data_merge['dysfunction'].map(dysfunction_explanations)
+
+    # Create the final DataFrame with needed columns
+    final_df = data_merge[['dysfunction', 'description', 'av_weight']].copy()
+
+    # Sort by average weight and reset the index
+    final_df.sort_values(by='av_weight', ascending=False, inplace=True)
+    final_df.reset_index(drop=True, inplace=True)
+
+    return final_df
 
 # cas marge
 def cas_marge(answers_url, api_url):
@@ -388,10 +490,9 @@ def average_family_scores(answers_url, api_url):
 ###### USER INTERFACE ############
 ##################################
 
-st.title("Générateur d'image pour e-diag augmenté")
+st.title("Générer les resultats de ma campagne")
 
 # input paths
-st.header('Input paths')
 
 here = os.getcwd()
 assets = os.path.join(here, 'assets')
@@ -400,37 +501,42 @@ assets = os.path.join(here, 'assets')
 results_folder = os.path.join(here, 'results')
 #st.write(f'output files and report saved to: {results_folder}')
 
-single = st.checkbox("Cocher si cet e-diag ne concerne qu'une seule personne")
-
+single = st.checkbox("Cocher si cet e-diag ne concerne qu'un seule répondant ('Ecart des réponses', 'Cas en marge' et 'points de désaccord' ne seront pas générés).")
 if single:
-    st.write("Une seule personne a répondu. 'Ecart des réponses', 'Cas en marge' et 'points de désaccord' non disponibles.")
+    st.write("Une seule personne a répondu. 'L'écart des réponses', 'Les cas à la marge' et 'Les points de désaccord' non disponibles.")
 
-# naming convention for files
-st.header('input information')
-#client_real_name = st.text_input("Le nom de l'équipe concerné : ")
-#client_name = client_real_name.replace(' ','_')
-#st.write(f'save name is {client_name}')
+#st.header("Informations de la campagne")
 
 form_theme = 'Collaborer en Équipe'
 api_url = st.secrets["api_url"]
 thematics = 'team'
 
-campaign = st.text_input('Enter campaign id')
+campaign = st.text_input("Entrez le id de la campagne (de type : XX) :")
 
 if not campaign or campaign == "":
-    st.error("Veuillez renseigner le 'id' de campagne (fournit par Argios) 😔 et appuyez [Enter]")
+    st.error("Veuillez renseigner le 'id' de campagne (fourni par Argios) 😉 et appuyez [Enter] ↪️")
 
 answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
 
 
-st.header("Top 5 dysfonctionnements")
+st.header("Mes principaux dysfonctionnements")
 
-st.write("Voici les cinq dysfonctionnements qui, selon nous, requièrent une attention particulière")
+st.write("Voici les principaux dysfonctionnements identifiés :")
 
-top5 = dysfunction_frequencies(answers_url, api_url)
-top5_dframe = top5.drop(columns=["weight"])
+top5 = dysfunction_frequencies(answers_url, api_url).head(5)
+top5_dframe = top5.drop(columns=["av_weight"])
+top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
 st.dataframe(data=top5_dframe)
+top_5_list = top5_dframe["dysfonctionnement"].values.tolist()
+
+st.write("Les cinq dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
+
+most_top5 = most_serious(answers_url, api_url)
+#df[~df['A'].isin([3, 6])]
+most_top5_dframe = most_top5.drop(columns=["weight"])
+most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
+st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
 
 st.header("Vision Globale")
 
@@ -492,27 +598,29 @@ if single == False:
 else:
     st.write("Une seule personne a répondu, les cas en marge ne sont pas disponibles")
 
-st.header("Les cas en marge")
+st.header("Les cas à la marge")
 if single == False:
     # cas en marge
     cas_marge_df = cas_marge(answers_url, api_url)
+    st.write(f"Vous avez {cas_marge_df.shape[0]} cas à la marge. Ci-dessous les {cas_marge_df.shape[0]} dysfonctionnements pour lesquels un répondant n'est pas aligné avec le reste de l'équipe. Cela peut être dû à un isolement du répondant.")
     #show cas marge
     st.dataframe(data=cas_marge_df)
 else:
     st.write("Une seule personne a répondu, les points de désaccord ne sont pas disponibles")
 
-st.header('Les point de désaccord')
+st.header('Les points de désaccord')
 if single == False:
     # cas en marge
     disagree = augmented_disagree(answers_url, api_url)
     disagree_df = disagree.drop(columns = ["sum", "verdict"])
+    st.write(f"Ci-dessous les {disagree_df.shape[0]} dysfonctionnements pour lesquels une moitié de l'équipe n'est pas en accord avec l'autre moitié.")
     # show disagree
     st.dataframe(data=disagree_df)
 
-st.header("Solutions")
+st.header("Les solutions proposées")
 solutions = get_all_solutions(assets, answers_url, api_url)
 selection = aggrid_interactive_table(df=solutions)
 filtered_solutions = selection['selected_rows']
-st.write("selected solutions")
+st.write("Les solutions séléctionnées:")
 st.dataframe(data=filtered_solutions)
 
