@@ -530,7 +530,7 @@ top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
 st.dataframe(data=top5_dframe)
 top_5_list = top5_dframe["dysfonctionnement"].values.tolist()
 
-st.write("Les cinq dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
+st.write("Les dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
 
 most_top5 = most_serious(answers_url, api_url)
 #df[~df['A'].isin([3, 6])]
