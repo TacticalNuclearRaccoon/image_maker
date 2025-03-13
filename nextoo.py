@@ -19,23 +19,17 @@ import numpy as np
 import streamlit as st
 import os
 import plotly.graph_objects as go
-#from PyPDF2 import PdfReader, PdfWriter
-#from io import BytesIO
-#from reportlab.pdfgen import canvas
 import requests
-#import shutil
-#import subprocess
-#from pathlib import Path
 from collections import defaultdict
 from st_aggrid import AgGrid, GridOptionsBuilder
 from st_aggrid.shared import GridUpdateMode
-#from PIL import Image
+from itertools import count
 
 ###############################
 ########## FUNCTIONS ##########
 ###############################
  
-st.set_page_config(layout='centered', page_icon=':octopus:')
+st.set_page_config(layout='wide', page_icon=':octopus:')
 
 def aggrid_interactive_table(df: pd.DataFrame):
     """Creates an st-aggrid interactive table based on a dataframe.
@@ -292,8 +286,7 @@ def get_all_solutions(assets_path, answers_url, api_url):
         Path to the json file with themes and planets data.
     '''
     # get top5 dysfunctions
-    frequencies = dysfunction_frequencies(answers_url, api_url)
-    top5 = frequencies.head(5)
+    top5 = dysfunction_frequencies(answers_url, api_url)
     client_dys = top5['dysfunction'].values
     # read the solutions dataframe
     leveled_solutions = pd.read_csv(f'{assets_path}/csv_files/leveled_solutions_multiverse_20250312.csv')
@@ -407,7 +400,7 @@ assets = os.path.join(here, 'assets')
 results_folder = os.path.join(here, 'results')
 #st.write(f'output files and report saved to: {results_folder}')
 
-single = st.checkbox("Cet e-diag ne concerne qu'une seule personne")
+single = st.checkbox("Cocher si cet e-diag ne concerne qu'une seule personne")
 
 if single:
     st.write("Une seule personne a répondu. 'Ecart des réponses', 'Cas en marge' et 'points de désaccord' non disponibles.")
@@ -423,8 +416,21 @@ api_url = st.secrets["api_url"]
 thematics = 'team'
 
 campaign = st.text_input('Enter campaign id')
+
+if not campaign or campaign == "":
+    st.error("Veuillez renseigner le 'id' de campagne (fournit par Argios) 😔 et appuyez [Enter]")
+
 answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
+
+
+st.header("Top 5 dysfonctionnements")
+
+st.write("Voici les cinq dysfonctionnements qui, selon nous, requièrent une attention particulière")
+
+top5 = dysfunction_frequencies(answers_url, api_url)
+top5_dframe = top5.drop(columns=["weight"])
+st.dataframe(data=top5_dframe)
 
 st.header("Vision Globale")
 
@@ -435,7 +441,11 @@ else:
     fig_everyone, ax_everyone = plt.subplots(figsize=(10,10))
 sns.heatmap(everyone,annot=False, linewidths=.5, ax=ax_everyone, xticklabels=False, cbar=False, cmap="BuPu")
 plt.tight_layout()
-st.pyplot(fig_everyone)
+
+col1, _ = st.columns([2,1])
+with col1:
+    st.pyplot(fig_everyone)
+
 # save heatmap
 # fig_everyone.savefig(f'{results_folder}/{client_name}_vision_globale.png', dpi=100, transparent=True)
 #st.write(f'created: {client_name}_vision_globale.png ✅')
@@ -476,7 +486,9 @@ if single == False:
     ecart_ax.spines['right'].set_visible(False)
     plt.tight_layout()
     st.write(f"Il y a un écart dans {ecart}% des réponses aux questions. Ainsi, l'équipe est en phase à {agree}%")
-    st.pyplot(ecart_fig)
+    col1, _ = st.columns([2,1])
+    with col1:
+        st.pyplot(ecart_fig)
 else:
     st.write("Une seule personne a répondu, les cas en marge ne sont pas disponibles")
 
@@ -492,7 +504,8 @@ else:
 st.header('Les point de désaccord')
 if single == False:
     # cas en marge
-    disagree_df = augmented_disagree(answers_url, api_url)
+    disagree = augmented_disagree(answers_url, api_url)
+    disagree_df = disagree.drop(columns = ["sum", "verdict"])
     # show disagree
     st.dataframe(data=disagree_df)
 
