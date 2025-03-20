@@ -513,114 +513,113 @@ thematics = 'team'
 
 campaign = st.text_input("Entrez le id de la campagne (de type : XX) :")
 
-if not campaign or campaign == "":
-    st.error("Veuillez renseigner le 'id' de campagne (fourni par Argios) 😉 et appuyez [Enter] ↪️")
-
 answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
 
 
-st.header("Mes principaux dysfonctionnements")
 
-st.write("Voici les principaux dysfonctionnements identifiés :")
+if campaign:
+    st.header("Mes principaux dysfonctionnements")
+    st.write("Voici les principaux dysfonctionnements identifiés :")    
+    top5 = dysfunction_frequencies(answers_url, api_url).head(5)
+    top5_dframe = top5.drop(columns=["av_weight"])
+    top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
+    st.dataframe(data=top5_dframe)
+    top_5_list = top5_dframe["dysfonctionnement"].values.tolist()
 
-top5 = dysfunction_frequencies(answers_url, api_url).head(5)
-top5_dframe = top5.drop(columns=["av_weight"])
-top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
-st.dataframe(data=top5_dframe)
-top_5_list = top5_dframe["dysfonctionnement"].values.tolist()
+    st.write("Les dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
 
-st.write("Les dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
+    most_top5 = most_serious(answers_url, api_url)
+    #df[~df['A'].isin([3, 6])]
+    most_top5_dframe = most_top5.drop(columns=["weight"])
+    most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
+    st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
 
-most_top5 = most_serious(answers_url, api_url)
-#df[~df['A'].isin([3, 6])]
-most_top5_dframe = most_top5.drop(columns=["weight"])
-most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
-st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
+    st.header("Vision Globale")
 
-st.header("Vision Globale")
-
-everyone = augmented_map_dysfunctions(answers_url, api_url)
-if single:
-    fig_everyone, ax_everyone = plt.subplots(figsize=(10,4)) 
-else:
-    fig_everyone, ax_everyone = plt.subplots(figsize=(10,10))
-sns.heatmap(everyone,annot=False, linewidths=.5, ax=ax_everyone, xticklabels=False, cbar=False, cmap="BuPu")
-plt.tight_layout()
-
-col1, _ = st.columns([2,1])
-with col1:
-    st.pyplot(fig_everyone)
-
-# save heatmap
-# fig_everyone.savefig(f'{results_folder}/{client_name}_vision_globale.png', dpi=100, transparent=True)
-#st.write(f'created: {client_name}_vision_globale.png ✅')
-
-st.header('Écart des réponses')
-if single == False:
-    team_gap_df = team_gap(answers_url, api_url)
-    # create gauge images 
-    # create the bar plot for écart réponses page
-    # Create figure and axis
-    ecart_fig, ecart_ax = plt.subplots(figsize=(10, 0.5))
-    plt.gca().set_axis_off()
-    plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
-    plt.margins(0,0)
-    agree = round(team_gap_df["% d'accord"].mean())
-    ecart = 100-agree
-
-    # Data
-    categories = ['']  # Single bar, so single category
-    percentages = [agree, ecart]  # The lengths of the segments of the bar
-    colors = ['#FF5F6D', '#4A00E0']  # The colors for each segment
-        
-    # Create the stacked bar graph
-    bars = plt.barh(categories, percentages[0], color=colors[0])
-    bars = plt.barh(categories, percentages[1], left=percentages[0], color=colors[1])
-                
-    # Annotate the segments of the stacked bar
-    plt.text(percentages[0] / 2, 0, f'{percentages[0]}%', va='center', ha='center', color='white', fontweight='bold')
-    plt.text(percentages[0] + percentages[1] / 2, 0, f'{percentages[1]}%', va='center', ha='center', color='white', fontweight='bold')
-    plt.tick_params(
-        axis='x',          # changes apply to the x-axis
-        which='both',      # both major and minor ticks are affected
-        bottom=False,      # ticks along the bottom edge are off
-        top=False,         # ticks along the top edge are off
-        labelbottom=False) # labels along the bottom edge are off
-    plt.axis('off')
-    # Remove the spines
-    ecart_ax.spines['right'].set_visible(False)
+    everyone = augmented_map_dysfunctions(answers_url, api_url)
+    if single:
+        fig_everyone, ax_everyone = plt.subplots(figsize=(10,4)) 
+    else:
+        fig_everyone, ax_everyone = plt.subplots(figsize=(10,10))
+    sns.heatmap(everyone,annot=False, linewidths=.5, ax=ax_everyone, xticklabels=False, cbar=False, cmap="BuPu")
     plt.tight_layout()
-    st.write(f"Il y a un écart dans {ecart}% des réponses aux questions. Ainsi, l'équipe est en phase à {agree}%")
+
     col1, _ = st.columns([2,1])
     with col1:
-        st.pyplot(ecart_fig)
+        st.pyplot(fig_everyone)
+
+    # save heatmap
+    # fig_everyone.savefig(f'{results_folder}/{client_name}_vision_globale.png', dpi=100, transparent=True)
+    #st.write(f'created: {client_name}_vision_globale.png ✅')
+
+    st.header('Écart des réponses')
+    if single == False:
+        team_gap_df = team_gap(answers_url, api_url)
+        # create gauge images 
+        # create the bar plot for écart réponses page
+        # Create figure and axis
+        ecart_fig, ecart_ax = plt.subplots(figsize=(10, 0.5))
+        plt.gca().set_axis_off()
+        plt.subplots_adjust(top = 1, bottom = 0, right = 1, left = 0, hspace = 0, wspace = 0)
+        plt.margins(0,0)
+        agree = round(team_gap_df["% d'accord"].mean())
+        ecart = 100-agree
+
+        # Data
+        categories = ['']  # Single bar, so single category
+        percentages = [agree, ecart]  # The lengths of the segments of the bar
+        colors = ['#FF5F6D', '#4A00E0']  # The colors for each segment
+            
+        # Create the stacked bar graph
+        bars = plt.barh(categories, percentages[0], color=colors[0])
+        bars = plt.barh(categories, percentages[1], left=percentages[0], color=colors[1])
+                    
+        # Annotate the segments of the stacked bar
+        plt.text(percentages[0] / 2, 0, f'{percentages[0]}%', va='center', ha='center', color='white', fontweight='bold')
+        plt.text(percentages[0] + percentages[1] / 2, 0, f'{percentages[1]}%', va='center', ha='center', color='white', fontweight='bold')
+        plt.tick_params(
+            axis='x',          # changes apply to the x-axis
+            which='both',      # both major and minor ticks are affected
+            bottom=False,      # ticks along the bottom edge are off
+            top=False,         # ticks along the top edge are off
+            labelbottom=False) # labels along the bottom edge are off
+        plt.axis('off')
+        # Remove the spines
+        ecart_ax.spines['right'].set_visible(False)
+        plt.tight_layout()
+        st.write(f"Il y a un écart dans {ecart}% des réponses aux questions. Ainsi, l'équipe est en phase à {agree}%")
+        col1, _ = st.columns([2,1])
+        with col1:
+            st.pyplot(ecart_fig)
+    else:
+        st.write("Une seule personne a répondu, les cas en marge ne sont pas disponibles")
+
+    st.header("Les cas à la marge")
+    if single == False:
+        # cas en marge
+        cas_marge_df = cas_marge(answers_url, api_url)
+        st.write(f"Vous avez {cas_marge_df.shape[0]} cas à la marge. Ci-dessous les {cas_marge_df.shape[0]} dysfonctionnements pour lesquels un répondant n'est pas aligné avec le reste de l'équipe. Cela peut être dû à un isolement du répondant.")
+        #show cas marge
+        st.dataframe(data=cas_marge_df)
+    else:
+        st.write("Une seule personne a répondu, les points de désaccord ne sont pas disponibles")
+
+    st.header('Les points de désaccord')
+    if single == False:
+        # cas en marge
+        disagree = augmented_disagree(answers_url, api_url)
+        disagree_df = disagree.drop(columns = ["sum", "verdict"])
+        st.write(f"Ci-dessous les {disagree_df.shape[0]} dysfonctionnements pour lesquels une moitié de l'équipe n'est pas en accord avec l'autre moitié.")
+        # show disagree
+        st.dataframe(data=disagree_df)
+
+    st.header("Les solutions proposées")
+    solutions = get_all_solutions(assets, answers_url, api_url)
+    selection = aggrid_interactive_table(df=solutions)
+    filtered_solutions = selection['selected_rows']
+    st.write("Les solutions séléctionnées:")
+    st.dataframe(data=filtered_solutions)
+
 else:
-    st.write("Une seule personne a répondu, les cas en marge ne sont pas disponibles")
-
-st.header("Les cas à la marge")
-if single == False:
-    # cas en marge
-    cas_marge_df = cas_marge(answers_url, api_url)
-    st.write(f"Vous avez {cas_marge_df.shape[0]} cas à la marge. Ci-dessous les {cas_marge_df.shape[0]} dysfonctionnements pour lesquels un répondant n'est pas aligné avec le reste de l'équipe. Cela peut être dû à un isolement du répondant.")
-    #show cas marge
-    st.dataframe(data=cas_marge_df)
-else:
-    st.write("Une seule personne a répondu, les points de désaccord ne sont pas disponibles")
-
-st.header('Les points de désaccord')
-if single == False:
-    # cas en marge
-    disagree = augmented_disagree(answers_url, api_url)
-    disagree_df = disagree.drop(columns = ["sum", "verdict"])
-    st.write(f"Ci-dessous les {disagree_df.shape[0]} dysfonctionnements pour lesquels une moitié de l'équipe n'est pas en accord avec l'autre moitié.")
-    # show disagree
-    st.dataframe(data=disagree_df)
-
-st.header("Les solutions proposées")
-solutions = get_all_solutions(assets, answers_url, api_url)
-selection = aggrid_interactive_table(df=solutions)
-filtered_solutions = selection['selected_rows']
-st.write("Les solutions séléctionnées:")
-st.dataframe(data=filtered_solutions)
-
+    st.write("Veuillez renseigner le 'id' de campagne (fourni par Argios) 😉 et appuyez [Enter] ↪️ pour commencer")
