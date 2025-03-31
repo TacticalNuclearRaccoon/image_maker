@@ -352,7 +352,7 @@ def dysfunction_frequencies(answers_url, api_url):
     return final_df
 
 
-# Top 5 dysfunctions
+# Anti-dysfunctions
 def points_forts(answers_url, api_url):
     # Fetch the responses from the answers API
     response = requests.get(answers_url)
@@ -417,8 +417,52 @@ def points_forts(answers_url, api_url):
     result1 = data_merge.sort_values(by='weight', ascending=False)
     result1.reset_index(drop=True, inplace=True)
     result3 = result1[~result1['dysfunction'].isin(diagnosed)]
+    result3.rename(columns={"dysfunction":"dysfonctionnement"}, inplace=True)
 
     return result3
+
+
+def vision_globale_page(assets_path, client_name, results_folder):
+    """Creates the Vision Globale pdf page
+    Arguments:
+    ----------
+    assets_path: str
+        path to the pdf templates
+    client_name: str
+        naming convention for the figures
+    results_folder: str
+        path to fetch the vison globale heatmap figure"""
+    
+    pdf_document = fitz.open(f'{assets_path}/pdf_templates/emptyPage.pdf')
+    page_number = 0
+    page = pdf_document.load_page(page_number)
+    
+    light_font_file= f'{assets_path}/font_files/AzoSans-Light.ttf'
+    bold_font_file= f'{assets_path}/font_files/AzoSans-Black.ttf'
+    page.insert_font(fontfile=light_font_file, fontname="AzoLight")
+    page.insert_font(fontfile=bold_font_file, fontname="AzoBold")
+    
+    title = "Vision Globale"
+    title_position = (100, 80)
+    page.insert_text(title_position, title, fontsize= 14, fontname="AzoBold")
+    
+    #insert image
+    position1 = (160,70)
+    image_rect1 = fitz.Rect(position1[0], position1[1], position1[0] + 500, position1[1] + 470)
+    page.insert_image(image_rect1, filename=f"{results_folder}/{client_name}_vision_globale.png")
+    
+    # Insert Legende
+    legende_position = (550,100)
+    legende = fitz.Rect(legende_position[0], legende_position[1], legende_position[0] + 400, legende_position[1] + 400)
+    page.insert_image(legende, filename=f"{assets_path}/images/legendeHeatmap.png")
+    
+    text = """Légende :\n* Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.\n* Chaque colonne correspond à une personne de l’équipe. """
+    p = (90, 540, 810, 700)
+    page.insert_textbox(p, text, fontsize=8, fontname="AzoLight", lineheight=1.5)
+
+    # Save the modified PDF to a new file
+    pdf_document.save(f'{results_folder}/{client_name}_visionglobale.pdf')
+    pdf_document.close()
 
 # cas marge
 def cas_marge(answers_url, api_url):
@@ -625,8 +669,16 @@ if campaign:
         st.pyplot(fig_everyone)
 
     # save heatmap
-    # fig_everyone.savefig(f'{results_folder}/{client_name}_vision_globale.png', dpi=100, transparent=True)
-    #st.write(f'created: {client_name}_vision_globale.png ✅')
+    fig_everyone.savefig(f'{results_folder}/campagne_{campaign}_vision_globale.png', dpi=100, transparent=True)
+    st.write(f'created: campagne_{campaign}_vision_globale.png ✅')
+
+    vision_globale_page(assets, f"campagne_{campaign}", results_folder)
+    with open(f"{results_folder}/campagne_{campaign}_visionglobale.pdf", "rb") as file:
+        btn = st.download_button(
+            label="Download vision globale page",
+            data=file,
+            file_name=f"campagne_{campaign}visionglobale.pdf")
+    
 
     st.header('Écart des réponses')
     if single == False:
