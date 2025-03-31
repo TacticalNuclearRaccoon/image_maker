@@ -72,7 +72,6 @@ def most_serious(answers_url, api_url):
 
     # Filter out the people who turbo-clicked
     unfiltered_data = [item for item in all_data]
-
     all_data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
 
     # Create a mapping of dysfunction labels to explanations
@@ -87,13 +86,19 @@ def most_serious(answers_url, api_url):
 
     # Process each user's response
     for response in all_data:
+        detected_dysfunctions = set()  # Track dysfunctions detected by this respondent
+
         for answer in response["answers"]:
             for family in themes_and_planets_data.get("families", []):
                 for dysfunction in family.get("dysfunctions", []):
                     for question in dysfunction.get("questions", []):
                         if answer["questionId"] == question["id"] and answer["answer"] in question["responseTrigger"]:
                             dysfunction_scores[dysfunction["label"]]["weight_sum"] += dysfunction.get("weight", 0)
-                            dysfunction_scores[dysfunction["label"]]["count"] += 1  # Count occurrences
+                            detected_dysfunctions.add(dysfunction["label"])  # Store detected dysfunction
+
+        # After processing all answers of a respondent, increment count for unique dysfunctions detected
+        for dysfunction in detected_dysfunctions:
+            dysfunction_scores[dysfunction]["count"] += 1  
 
     # Convert dysfunction scores to a DataFrame
     df = pd.DataFrame([
@@ -107,7 +112,7 @@ def most_serious(answers_url, api_url):
     ])
 
     # Sort dysfunctions by highest average weight and return the top 5
-    df = df.sort_values(by="weight", ascending=False).head(5).reset_index(drop=True)
+    df = df.sort_values(by="weight", ascending=False).reset_index(drop=True)
 
     return df
 
@@ -351,6 +356,44 @@ def dysfunction_frequencies(answers_url, api_url):
 
     return final_df
 
+def teams_top5_merged(campaign_nums, api_url):
+    dfs = []
+    for num in campaign_nums:
+        answers = f"https://api.argios.net/api/responses/campaign/{num}"
+        df_campaign = dysfunction_frequencies(answers, api_url).head(5)
+        df_campaign.drop(columns=["description"],inplace=True)
+        df_campaign.rename(columns={"av_weight":f"c_{num}"}, inplace=True)
+        dfs.append(df_campaign)
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on="dysfunction", how="outer"), dfs)
+    data_merge.fillna(0, inplace=True)
+    teams = data_merge.set_index("dysfunction")
+    return teams
+
+def teams_merged(campaign_nums, api_url):
+    dfs = []
+    for num in campaign_nums:
+        answers = f"https://api.argios.net/api/responses/campaign/{num}"
+        df_campaign = dysfunction_frequencies(answers, api_url)
+        df_campaign.drop(columns=["description"],inplace=True)
+        df_campaign.rename(columns={"av_weight":f"c_{num}"}, inplace=True)
+        dfs.append(df_campaign)
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on="dysfunction", how="outer"), dfs)
+    data_merge.fillna(0, inplace=True)
+    teams = data_merge.set_index("dysfunction")
+    return teams
+
+def all_merged(campaign_nums, api_url):
+    dfs = []
+    for num in campaign_nums:
+        answers = f"https://api.argios.net/api/responses/campaign/{num}"
+        df_campaign = most_serious(answers, api_url)
+        df_campaign.drop(columns=["description", "weight"],inplace=True)
+        df_campaign.rename(columns={"people detected":f"c_{num}"}, inplace=True)
+        dfs.append(df_campaign)
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on="dysfunction", how="outer"), dfs)
+    data_merge.fillna(0, inplace=True)
+    teams = data_merge.set_index("dysfunction")
+    return teams
 
 # Anti-dysfunctions
 def points_forts(answers_url, api_url):
@@ -750,3 +793,101 @@ if campaign:
 
 else:
     st.write("Veuillez renseigner le 'id' de campagne (fourni par Argios) 😉 et appuyez [Enter] ↪️ pour commencer")
+
+st.header("Je veux comparer plusieurs équipes")
+
+identifiant_argios = st.text_input("Renseignez votre id (fourni par Argios)")
+st.write(f"votre identifiant Argios : {identifiant_argios}")
+
+user_ids = st.secrets["user_ids"]
+
+if identifiant_argios == user_ids[0]:
+    campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [35,36,37,38])
+    if campaign_nums:
+        st.write(f"Les campagnes choisis : {campaign_nums}")
+
+        st.header("L'ensemble des dysfonctionnements détectes")
+        st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
+        all_people = all_merged(campaign_nums, api_url)
+        fig_all, ax_all = plt.subplots(figsize=(10,10))
+        sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
+        plt.tight_layout()
+        st.pyplot(fig_all)
+        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+
+        st.header("L'ensemble des principaux dysfonctionnements détectes")
+        st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
+        
+        multi_top5 = teams_top5_merged(campaign_nums, api_url)
+        fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
+        sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
+        plt.tight_layout()
+        col1, _ = st.columns([2,1])
+        with col1:
+            st.pyplot(fig_top5)
+        st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
+        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+    else:
+        st.write("Veuillez choisir les numéros de campagne pour commencer.")
+
+if identifiant_argios == user_ids[1]:
+    campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [15, 18, 40])
+    if campaign_nums:
+        st.write(f"Les campagnes choisis : {campaign_nums}")
+
+        st.header("L'ensemble des dysfonctionnements détectes")
+        st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
+        all_people = all_merged(campaign_nums, api_url)
+        fig_all, ax_all = plt.subplots(figsize=(10,10))
+        sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
+        plt.tight_layout()
+        st.pyplot(fig_all)
+        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+
+        st.header("L'ensemble des principaux dysfonctionnements détectes")
+        st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
+        
+        multi_top5 = teams_top5_merged(campaign_nums, api_url)
+        fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
+        sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
+        plt.tight_layout()
+        col1, _ = st.columns([2,1])
+        with col1:
+            st.pyplot(fig_top5)
+        st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
+        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+    else:
+        st.write("Veuillez choisir les numéros de campagne pour commencer.")
+
+if identifiant_argios == user_ids[2] or identifiant_argios == user_ids[3]:
+    campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [14, 15, 17, 18, 33, 35, 36, 37, 38, 40])
+    if campaign_nums:
+        st.write(f"Les campagnes choisis : {campaign_nums}")
+
+        st.header("L'ensemble des dysfonctionnements détectes")
+        st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
+        all_people = all_merged(campaign_nums, api_url)
+        fig_all, ax_all = plt.subplots(figsize=(10,10))
+        sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
+        plt.tight_layout()
+        st.pyplot(fig_all)
+        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+
+        st.header("L'ensemble des principaux dysfonctionnements détectes")
+        st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
+        
+        multi_top5 = teams_top5_merged(campaign_nums, api_url)
+        fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
+        sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
+        plt.tight_layout()
+        col1, _ = st.columns([2,1])
+        with col1:
+            st.pyplot(fig_top5)
+        st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
+        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+    else:
+        st.write("Veuillez choisir les numéros de campagne pour commencer.")
+
+if identifiant_argios not in user_ids:
+    st.write("Veuillez entrer un identifiant valide.")
+
