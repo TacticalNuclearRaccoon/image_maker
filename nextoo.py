@@ -351,6 +351,75 @@ def dysfunction_frequencies(answers_url, api_url):
 
     return final_df
 
+
+# Top 5 dysfunctions
+def points_forts(answers_url, api_url):
+    # Fetch the responses from the answers API
+    response = requests.get(answers_url)
+    response.raise_for_status()
+    all_data = response.json()
+
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+
+    data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
+
+    # Fetch themes and planets data
+    response = requests.get(api_url)
+    response.raise_for_status()
+    response.cookies.clear()
+    themes_and_planets_data = response.json()
+
+    # Create a dictionary to map dysfunction labels to their explanations
+    dysfunction_explanations = {}
+    for family in themes_and_planets_data.get('families', []):
+        for dysfunction in family.get('dysfunctions', []):
+            dysfunction_label = dysfunction.get('label', 'Unknown Dysfunction')
+            dysfunction_explanations[dysfunction_label] = dysfunction.get('explanation', '')
+
+    # List to store DataFrames for each response
+    dfs = []
+
+    diagnosed_df = dysfunction_frequencies(answers_url, api_url)
+    diagnosed = diagnosed_df["dysfunction"].values.tolist()
+
+    # Process each user's response
+    for response in data:
+        answers = response['answers']
+        results = []
+
+        # Iterate over each family and dysfunction
+        for family in themes_and_planets_data.get('families', []):
+            for dysfunction in family.get('dysfunctions', []):
+                for question in dysfunction.get('questions', []):
+                    question_id = question['id']
+                    matching_answer = next((item for item in answers if item['questionId'] == question_id), None)
+
+                    if matching_answer:
+                        user_answer = matching_answer['answer']
+                        if user_answer not in question.get('responseTrigger', []):
+                            results.append({
+                                'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
+                                'weight': dysfunction.get('weight', 0)
+                            })
+
+        # Create a DataFrame for the current response
+        df = pd.DataFrame(results)
+        if not df.empty:
+            df.drop_duplicates(subset=['dysfunction'], inplace=True)
+            dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame(columns=['dysfunction', 'weight'])
+
+    data_merge = pd.concat(dfs).drop_duplicates(subset=['dysfunction']).reset_index(drop=True)
+    
+    result1 = data_merge.sort_values(by='weight', ascending=False)
+    result1.reset_index(drop=True, inplace=True)
+    result3 = result1[~result1['dysfunction'].isin(diagnosed)]
+
+    return result3
+
 # cas marge
 def cas_marge(answers_url, api_url):
     '''Returns marginal cases as dataframe
@@ -519,9 +588,15 @@ answers_url = f'{answers_prefix}/{campaign}'
 
 
 if campaign:
+    st.header("Mes points forts")
+    st.write("Voici les dysfonctionnements qui n'ont pas été identifiés")
+    atouts = points_forts(answers_url, api_url)
+    st.dataframe(data=atouts.head(5))
     st.header("Mes principaux dysfonctionnements")
-    st.write("Voici les principaux dysfonctionnements identifiés :")    
-    top5 = dysfunction_frequencies(answers_url, api_url).head(5)
+    top = st.number_input("Entrez le nombre de dysfonctionnements à étudier:")
+    topx = int(top)    
+    st.write(f"Voici les {topx} principaux dysfonctionnements identifiés :")    
+    top5 = dysfunction_frequencies(answers_url, api_url).head(topx)
     top5_dframe = top5.drop(columns=["av_weight"])
     top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
     st.dataframe(data=top5_dframe)
