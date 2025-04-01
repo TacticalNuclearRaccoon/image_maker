@@ -740,8 +740,6 @@ st.title("Générer les resultats de ma campagne")
 here = os.getcwd()
 assets = os.path.join(here, 'assets')
 #st.write(f'assets files fetched from: {assets}')
-#path to save results
-results_folder = os.path.join(here, 'results')
 #st.write(f'output files and report saved to: {results_folder}')
 
 single = st.checkbox("Cocher si cet e-diag ne concerne qu'un seule répondant ('Ecart des réponses', 'Cas en marge' et 'points de désaccord' ne seront pas générés).")
@@ -807,17 +805,6 @@ if campaign:
     col1, _ = st.columns([2,1])
     with col1:
         st.pyplot(fig_everyone)
-
-    # save heatmap
-    fig_everyone.savefig(f'{results_folder}/campagne_{campaign}_vision_globale.png', dpi=100, transparent=True)
-    st.write(f'created: campagne_{campaign}_vision_globale.png ✅')
-
-    vision_globale_page(assets, f"campagne_{campaign}", results_folder)
-    with open(f"{results_folder}/campagne_{campaign}_visionglobale.pdf", "rb") as file:
-        btn = st.download_button(
-            label="Download vision globale page",
-            data=file,
-            file_name=f"campagne_{campaign}visionglobale.pdf")
 
     st.header("Le pourquoi du comment")
     st.write("Voici les réponses qui ont été prises en compte pour la détection des dysfonctionnements")
