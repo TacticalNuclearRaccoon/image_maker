@@ -1,0 +1,29 @@
+,dysfunction,anti_dysfunction
+0,L'équipe ne s'approprie pas assez le sens métier,L’équipe s’approprie suffisamment le sens métier
+1,L'équipe n'a pas d'objectifs priorisés,L’équipe a des objectifs bien priorisés
+2,L'ambiance n'est pas au beau fixe,L'ambiance est au beau fixe
+3,L'équipe ne se sent pas responsable,L'équipe se sent responsable
+4,L'équipe est déresponsabilisée,L'équipe est bien responsabilisée
+5,Les membres de l’équipe ne communiquent pas suffisamment,Les membres de l’équipe échangent suffisamment pour éviter les malentendus ou doublons.
+6,Une personne impose régulièrement des décisions,Les décisions sont prises de manière collective et impliquent tous les membres concernés.
+7,"En l’absence d’un membre, l’équipe est fortement ralentie","""L’équipe peut maintenir son rythme de travail, même en cas d’absence d’un membre clé."""
+8,L’équipe n’a pas d’objectif commun,"""Les membres de l’équipe partagent une compréhension claire des objectifs globaux."""
+9,Des membres de l’équipe font de la rétention d’information,"""Les informations nécessaires sont partagées ouvertement entre tous les membres de l’équipe."""
+10,L’ambiance n’est pas au beau fixe,"""L’ambiance de l’équipe favorise une collaboration productive et positive."""
+11,L’équipe dit oui à tout,"""L’équipe sait refuser des demandes qui pourraient compromettre la qualité ou les délais."""
+12,L’équipe se remet rarement en cause,"""L’équipe analyse régulièrement ses erreurs pour améliorer ses pratiques et processus."""
+13,Les équipes frontend et backend travaillent en silo,"""Les équipes frontend et backend collaborent efficacement pour garantir des intégrations fluides."""
+14,Les développeurs et les testeurs ne partagent pas leurs attentes,"""Les attentes entre développeurs et testeurs sont clairement définies et communiquées."""
+15,Manque de collaboration avec l’équipe infrastructure/DevOps,"""L’équipe collabore étroitement avec les équipes infrastructure/DevOps pour assurer des déploiements fiables."""
+16,Les membres de l’équipe ne participent pas aux revues de code,"""Les membres de l’équipe participent activement aux revues de code."""
+17,L’équipe ne partage pas ses connaissances sur les outils,"""Les outils utilisés par l’équipe sont bien documentés et leur utilisation est partagée entre tous les membres."""
+18,Manque de transparence sur l’état d’avancement des tâches,"""L’état d’avancement des tâches est clairement communiqué au sein de l’équipe."""
+19,Les membres ne collaborent pas sur les problèmes complexes,"""Les problèmes complexes sont abordés collectivement pour trouver les meilleures solutions."""
+20,L’équipe ne sollicite pas d’avis externe,"""L’équipe cherche activement des conseils ou des avis externes lorsqu’elle rencontre des obstacles."""
+21,Les dépendances inter-équipes sont mal gérées,"""Les dépendances avec les autres équipes sont clairement identifiées et bien gérées."""
+22,Conflits non résolus entre membres de l’équipe,"""Les conflits au sein de l’équipe sont identifiés et résolus rapidement."""
+23,Absence de pair programming ou de mob programming,"""Le pair programming ou le mob programming est régulièrement utilisé pour résoudre des problèmes."""
+24,Manque de collaboration lors des rétrospectives,"""Tous les membres de l’équipe participent activement aux rétrospectives pour améliorer les pratiques."""
+25,Les outils de collaboration ne sont pas utilisés efficacement,"""Les outils de collaboration sont utilisés de manière optimale pour favoriser les échanges."""
+26,Manque de vision commune dans l’équipe,"""L’équipe partage une vision claire et commune sur les objectifs à atteindre."""
+27,L’équipe néglige les aspects relationnels,"""Les relations humaines au sein de l’équipe sont activement entretenues et valorisées."""

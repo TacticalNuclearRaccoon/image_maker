@@ -356,6 +356,93 @@ def dysfunction_frequencies(answers_url, api_url):
 
     return final_df
 
+#Why the dysfunctions that have been identified were identified
+def why(answers_url, api_url):
+    # Fetch the responses from the answers API
+    response = requests.get(answers_url)
+    response.raise_for_status()
+    all_data = response.json()
+
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+    data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
+
+    # Fetch themes and planets data
+    response = requests.get(api_url)
+    response.raise_for_status()
+    response.cookies.clear()
+    themes_and_planets_data = response.json()
+
+    # Create a dictionary to map dysfunction labels to their explanations
+    dysfunction_explanations = {
+        dysfunction.get('label', 'Unknown Dysfunction'): dysfunction.get('explanation', '')
+        for family in themes_and_planets_data.get('families', [])
+        for dysfunction in family.get('dysfunctions', [])
+    }
+
+    # List to store DataFrames for each response
+    dfs = []
+
+    # Process each user's response
+    for response in data:
+        answers = response['answers']
+        response_id = response['id']
+        results = []
+
+        # Iterate over each family and dysfunction
+        for family in themes_and_planets_data.get('families', []):
+            for dysfunction in family.get('dysfunctions', []):
+                for question in dysfunction.get('questions', []):
+                    question_id = question['id']
+                    matching_answer = next((item for item in answers if item['questionId'] == question_id), None)
+
+                    if matching_answer:
+                        user_answer = matching_answer['answer']
+                        if user_answer in question.get('responseTrigger', []):
+                            results.append({
+                                'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
+                                'weight': dysfunction.get('weight', 0),
+                                'family': family.get('title', 'Unknown Family'),
+                                'explanation': dysfunction.get('explanation', ''),
+                                'question_text': question.get('label', 'Unknown Question'),
+                                'triggering_response': user_answer
+                            })
+
+        # Create a DataFrame for the current response
+        df = pd.DataFrame(results)
+        if not df.empty:
+            df.drop_duplicates(subset=['dysfunction', 'question_text', 'triggering_response'], inplace=True)
+            df.rename(columns={'weight': response_id}, inplace=True)
+            dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame(columns=['dysfunction', 'question_text', 'triggering_response', 'description', 'av_weight'])
+
+    # Merge all DataFrames on 'dysfunction', 'question_text', and 'triggering_response'
+    for i, df in enumerate(dfs):
+        df.rename(columns={col: f"{col}_{i}" for col in df.columns if col not in ["dysfunction", "question_text", "triggering_response"]}, inplace=True)
+
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on=["dysfunction", "question_text", "triggering_response"], how="outer"), dfs)
+    
+    data_merge.fillna(0, inplace=True)
+
+    # Calculate average weight
+    numeric_cols = data_merge.select_dtypes(include=np.number).columns
+    data_merge['av_weight'] = data_merge[numeric_cols].mean(axis=1)
+
+    # Add explanations from the dictionary if they are missing
+    data_merge['description'] = data_merge['dysfunction'].map(dysfunction_explanations)
+
+    # Create the final DataFrame with needed columns
+    final_df = data_merge[['dysfunction', 'question_text', 'triggering_response', 'description', 'av_weight']].copy()
+
+    # Sort by average weight and reset the index
+    final_df.sort_values(by='av_weight', ascending=False, inplace=True)
+    final_df.reset_index(drop=True, inplace=True)
+
+    return final_df
+
+
 def teams_top5_merged(campaign_nums, api_url):
     dfs = []
     for num in campaign_nums:
@@ -676,26 +763,31 @@ answers_url = f'{answers_prefix}/{campaign}'
 
 if campaign:
     st.header("Mes points forts")
-    st.write("Voici les dysfonctionnements qui n'ont pas été identifiés")
+    st.write("Voici les dysfonctionnements qui N'ONT PAS été identifiés")
     atouts = points_forts(answers_url, api_url)
+    atouts.drop(columns=["weight"],inplace=True)
     st.dataframe(data=atouts.head(5))
+
     st.header("Mes principaux dysfonctionnements")
-    top = st.number_input("Entrez le nombre de dysfonctionnements à étudier:")
-    topx = int(top)    
-    st.write(f"Voici les {topx} principaux dysfonctionnements identifiés :")    
-    top5 = dysfunction_frequencies(answers_url, api_url).head(topx)
+    top5 = dysfunction_frequencies(answers_url, api_url)
     top5_dframe = top5.drop(columns=["av_weight"])
     top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
-    st.dataframe(data=top5_dframe)
-    top_5_list = top5_dframe["dysfonctionnement"].values.tolist()
-
-    st.write("Les dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
-
-    most_top5 = most_serious(answers_url, api_url)
-    #df[~df['A'].isin([3, 6])]
-    most_top5_dframe = most_top5.drop(columns=["weight"])
-    most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
-    st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
+    dys_selection = aggrid_interactive_table(df=top5_dframe)
+    filtered_dysfunctions = dys_selection['selected_rows']
+    st.write("Les dysfonctionnements séléctionnées:")
+    st.dataframe(data=filtered_dysfunctions)
+    top_5_list = []
+    try:
+        top_5_list = filtered_dysfunctions["dysfonctionnement"].values.tolist()
+    except:
+        st.write("Choisissez 5 dysfonctionnements ci-haut que vous condirérez comme étant critique pour l'équipe")
+    
+    if len(top_5_list) != 0:
+        st.write("Les dysfonctionnements ci-dessous, selon nous, requièrent une attention particulière :")
+        most_top5 = most_serious(answers_url, api_url)
+        most_top5_dframe = most_top5.drop(columns=["weight"])
+        most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
+        st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
 
     st.header("Vision Globale")
 
@@ -706,7 +798,12 @@ if campaign:
         fig_everyone, ax_everyone = plt.subplots(figsize=(10,10))
     sns.heatmap(everyone,annot=False, linewidths=.5, ax=ax_everyone, xticklabels=False, cbar=False, cmap="BuPu")
     plt.tight_layout()
+    st.markdown(f"""Légende :
 
+    - Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.
+
+    - Chaque colonne correspond à une personne de l’équipe.
+    """)
     col1, _ = st.columns([2,1])
     with col1:
         st.pyplot(fig_everyone)
@@ -721,7 +818,14 @@ if campaign:
             label="Download vision globale page",
             data=file,
             file_name=f"campagne_{campaign}visionglobale.pdf")
-    
+
+    st.header("Le pourquoi du comment")
+    st.write("Voici les réponses qui ont été prises en compte pour la détection des dysfonctionnements")
+
+    whyz = why(answers_url, api_url)
+    whyz.drop(columns=['description', 'av_weight'], inplace=True)
+    whyz.sort_values(by="dysfunction", inplace=True)
+    st.dataframe(data=whyz)
 
     st.header('Écart des réponses')
     if single == False:
