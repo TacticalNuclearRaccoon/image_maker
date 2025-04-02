@@ -12,18 +12,20 @@ Created on March 3 2025
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-import glob
+#import glob
 from functools import reduce
 import pymupdf as fitz
 import numpy as np
 import streamlit as st
 import os
-import plotly.graph_objects as go
+#import plotly.graph_objects as go
 import requests
 from collections import defaultdict
 from st_aggrid import AgGrid, GridOptionsBuilder
 from st_aggrid.shared import GridUpdateMode
-from itertools import count
+#from itertools import count
+import plotly.graph_objects as go
+import math
 
 ###############################
 ########## FUNCTIONS ##########
@@ -442,6 +444,223 @@ def why(answers_url, api_url):
 
     return final_df
 
+#TEAM HEALTH
+def all_dysfunction_frequencies(answers_url, api_url):
+    """
+    Computes the average weight of workplace dysfunctions based on survey responses.
+
+    This function retrieves survey responses from an API and identifies workplace dysfunctions triggered by 
+    respondents' answers. It ensures that all dysfunctions appear in the final dataset, even if they were 
+    not triggered by any respondent (in which case they receive an average weight of 0).
+
+    Parameters:
+    -----------
+    answers_url : str
+        The API endpoint URL to fetch survey responses.
+    api_url : str
+        The API endpoint URL to fetch dysfunctions and their associated metadata.
+
+    Returns:
+    --------
+    pandas.DataFrame
+        A DataFrame containing the following columns:
+        - 'dysfunction': The label of the workplace dysfunction.
+        - 'description': A textual explanation of the dysfunction.
+        - 'av_weight': The average dysfunction weight across respondents.
+        
+    The DataFrame is sorted in descending order of 'av_weight' to prioritize the most significant dysfunctions.
+
+    Workflow:
+    ---------
+    1. Fetch survey responses from the `answers_url` API.
+    2. Filter out turbo-clickers (respondents who gave identical answers to all questions).
+    3. Fetch dysfunctions and their metadata from the `api_url` API.
+    4. Construct a dataset where every dysfunction is present for every respondent.
+    5. Assign dysfunction weights:
+       - If a dysfunction was triggered, its predefined weight is used.
+       - If not triggered, it is assigned a weight of 0.
+    6. Compute the average weight for each dysfunction across all respondents.
+    7. Return a sorted DataFrame with dysfunctions, descriptions, and average weights.
+
+    Notes:
+    ------
+    - The function assumes the `api_url` provides structured JSON data with 'families' containing dysfunctions.
+    - The function avoids missing dysfunctions by ensuring all are included in the dataset.
+    - Respondents who did not trigger a dysfunction still contribute to the average with a value of 0.
+
+    Dependencies:
+    -------------
+    - `requests`
+    - `pandas`
+    - `numpy`
+    - `functools.reduce`
+    """
+    # Fetch the responses from the answers API
+    response = requests.get(answers_url)
+    response.raise_for_status()
+    all_data = response.json()
+
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+    data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
+
+    # Fetch themes and planets data
+    response = requests.get(api_url)
+    response.raise_for_status()
+    response.cookies.clear()
+    themes_and_planets_data = response.json()
+
+    # Create a dictionary to map dysfunction labels to their explanations
+    dysfunction_explanations = {
+        dysfunction.get('label', 'Unknown Dysfunction'): dysfunction.get('explanation', '')
+        for family in themes_and_planets_data.get('families', [])
+        for dysfunction in family.get('dysfunctions', [])
+    }
+
+    # Get a full list of all dysfunctions
+    all_dysfunctions = [
+        {
+            'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
+            'weight': dysfunction.get('weight', 0),
+            'family': family.get('title', 'Unknown Family'),
+            'explanation': dysfunction.get('explanation', '')
+        }
+        for family in themes_and_planets_data.get('families', [])
+        for dysfunction in family.get('dysfunctions', [])
+    ]
+
+    # List to store DataFrames for each response
+    dfs = []
+
+    # Process each user's response
+    for response in data:
+        answers = response['answers']
+        response_id = response['id']
+        
+        # Create a DataFrame with all dysfunctions
+        df = pd.DataFrame(all_dysfunctions)
+
+        # Identify which dysfunctions were actually triggered
+        triggered_dysfunctions = set()
+        for family in themes_and_planets_data.get('families', []):
+            for dysfunction in family.get('dysfunctions', []):
+                for question in dysfunction.get('questions', []):
+                    question_id = question['id']
+                    matching_answer = next((item for item in answers if item['questionId'] == question_id), None)
+
+                    if matching_answer and matching_answer['answer'] in question.get('responseTrigger', []):
+                        triggered_dysfunctions.add(dysfunction.get('label', 'Unknown Dysfunction'))
+
+        # Assign weight only to triggered dysfunctions, otherwise set weight to 0
+        df[response_id] = df['dysfunction'].apply(lambda x: next((d['weight'] for d in all_dysfunctions if d['dysfunction'] == x), 0) if x in triggered_dysfunctions else 0)
+        
+        dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame(columns=['dysfunction', 'description', 'av_weight'])
+
+    # Merge all DataFrames on the 'dysfunction' column
+    for i, df in enumerate(dfs):
+        df.rename(columns={col: f"{col}_{i}" for col in df.columns if col != "dysfunction"}, inplace=True)
+
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on="dysfunction", how="outer"), dfs)
+    
+    data_merge.fillna(0, inplace=True)
+
+    # Calculate average weight
+    numeric_cols = data_merge.select_dtypes(include=np.number).columns
+    data_merge['av_weight'] = data_merge[numeric_cols].mean(axis=1)
+
+    # Add explanations from the dictionary if they are missing
+    data_merge['description'] = data_merge['dysfunction'].map(dysfunction_explanations)
+
+    # Create the final DataFrame with needed columns
+    final_df = data_merge[['dysfunction', 'description', 'av_weight']].copy()
+
+    # Sort by average weight and reset the index
+    final_df.sort_values(by='av_weight', ascending=False, inplace=True)
+    final_df.reset_index(drop=True, inplace=True)
+
+    return final_df
+
+
+def all_positives(answers_url, api_url):
+    # Fetch the responses from the answers API
+    response = requests.get(answers_url)
+    response.raise_for_status()
+    all_data = response.json()
+
+    # Filter out the people who turbo-clicked
+    unfiltered_data = [item for item in all_data]
+    data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
+
+    # Fetch themes and planets data
+    response = requests.get(api_url)
+    response.raise_for_status()
+    response.cookies.clear()
+    themes_and_planets_data = response.json()
+
+    # Create a dictionary to map dysfunction labels to their explanations
+    dysfunction_explanations = {
+        dysfunction.get('label', 'Unknown Dysfunction'): dysfunction.get('explanation', '')
+        for family in themes_and_planets_data.get('families', [])
+        for dysfunction in family.get('dysfunctions', [])
+    }
+
+    # List to store DataFrames for each response
+    dfs = []
+
+    # Get a list of all dysfunctions
+    all_dysfunctions = [
+        {
+            'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
+            'weight': dysfunction.get('weight', 0),
+            'family': family.get('title', 'Unknown Family'),
+            'explanation': dysfunction.get('explanation', '')
+        }
+        for family in themes_and_planets_data.get('families', [])
+        for dysfunction in family.get('dysfunctions', [])
+    ]
+
+    # Process each user's response
+    for response in data:
+        response_id = response['id']
+
+        # Instead of checking answers, assume all dysfunctions are triggered
+        df = pd.DataFrame(all_dysfunctions)
+
+        if not df.empty:
+            df.drop_duplicates(subset=['dysfunction'], inplace=True)
+            df.rename(columns={'weight': response_id}, inplace=True)
+            dfs.append(df)
+
+    if not dfs:
+        return pd.DataFrame(columns=['dysfunction', 'description', 'av_weight'])
+
+    # Merge all DataFrames on the 'dysfunction' column
+    for i, df in enumerate(dfs):
+        df.rename(columns={col: f"{col}_{i}" for col in df.columns if col != "dysfunction"}, inplace=True)
+
+    data_merge = reduce(lambda left, right: pd.merge(left, right, on="dysfunction", how="outer"), dfs)
+    
+    data_merge.fillna(0, inplace=True)
+
+    # Calculate average weight
+    numeric_cols = data_merge.select_dtypes(include=np.number).columns
+    data_merge['av_weight'] = data_merge[numeric_cols].mean(axis=1)
+
+    # Add explanations from the dictionary if they are missing
+    data_merge['description'] = data_merge['dysfunction'].map(dysfunction_explanations)
+
+    # Create the final DataFrame with needed columns
+    final_df = data_merge[['dysfunction', 'description', 'av_weight']].copy()
+
+    # Sort by average weight and reset the index
+    final_df.sort_values(by='av_weight', ascending=False, inplace=True)
+    final_df.reset_index(drop=True, inplace=True)
+
+    return final_df
+
 
 def teams_top5_merged(campaign_nums, api_url):
     dfs = []
@@ -757,8 +976,6 @@ campaign = st.text_input("Entrez le id de la campagne (de type : XX) :")
 answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
 
-
-
 if campaign:
     st.header("Mes points forts")
     st.write("Voici les dysfonctionnements qui N'ONT PAS été identifiés")
@@ -787,8 +1004,58 @@ if campaign:
         most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
         st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
 
-    st.header("Vision Globale")
+    st.header("La santé de l'équipe")
+    st.write("La *santé* de l'équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
+    st.write("Pour voire comme l'équipe se composte par rapport aux autres dans son secteur d'activité, cf le Chapitre 'Positionnement' dans le guide du management.")
 
+    #calculate health
+    pos = all_positives(answers_url, api_url)
+    team = all_dysfunction_frequencies(answers_url, api_url)
+    sum_team = team["av_weight"].sum()
+    sum_pos = pos["av_weight"].sum()
+    difference = sum_pos - sum_team
+    overall_h = round(100-(100*difference/sum_pos), 1)
+    
+
+    #gauge figure
+    if 45 <= overall_h <=75:
+        barcolor = "#FAD02C"
+    elif overall_h > 75:
+        barcolor = "#76B947"
+    elif overall_h < 45:
+        barcolor = "#DF362D"
+
+    gradient_steps = [
+        {'range': [0, 20], 'color': '#D10000'},  # Red
+        {'range': [20, 40], 'color': '#F37F1D'},  # Orange
+        {'range': [40, 60], 'color': '#FFFF8A'},  # Yellow
+        {'range': [60, 80], 'color': '#7ED957'},  # Light Green
+        {'range': [80, 100], 'color': '#008000'}]  # Green
+
+    go_fig = go.Figure(go.Indicator(
+        mode="gauge+number",
+        value=overall_h,
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={'text': "La santé de l'équipe", 'font': {'size': 24}},
+        gauge={
+            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+            'bar': {'color': barcolor},  # Make bar transparent to show steps as a gradient
+            'bgcolor': "white",
+            'borderwidth': 2,
+            'bordercolor': "gray",
+            'steps': gradient_steps,  # Apply the gradient colors
+            'threshold': {
+                'line': {'color': "green", 'width': 4},
+                'thickness': 0.75,
+                'value': 95}}))
+
+    go_fig.update_layout(paper_bgcolor="black", font={'color': "white", 'family': "Arial"})
+
+    st.plotly_chart(go_fig)
+
+    st.write(f"La santé de votre équipe est à {math.ceil(overall_h)}%")
+
+    st.header("Vision Globale")
     everyone = augmented_map_dysfunctions(answers_url, api_url)
     if single:
         fig_everyone, ax_everyone = plt.subplots(figsize=(10,4)) 
