@@ -1073,14 +1073,6 @@ if campaign:
     with col1:
         st.pyplot(fig_everyone)
 
-    st.header("Le pourquoi du comment")
-    st.write("Voici les réponses qui ont été prises en compte pour la détection des dysfonctionnements")
-
-    whyz = why(answers_url, api_url)
-    whyz.drop(columns=['description', 'av_weight'], inplace=True)
-    whyz.sort_values(by="dysfunction", inplace=True)
-    st.dataframe(data=whyz)
-
     st.header('Écart des réponses')
     if single == False:
         team_gap_df = team_gap(answers_url, api_url)
