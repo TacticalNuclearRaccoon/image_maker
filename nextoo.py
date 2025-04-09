@@ -948,9 +948,20 @@ def average_family_scores(answers_url, api_url):
     final = df[['index', 'score']].copy() 
     return final
 
+
 ##################################    
 ###### USER INTERFACE ############
 ##################################
+
+@st.cache_data
+def compute_health(answers_url, api_url):
+    pos = all_positives(answers_url, api_url)
+    team = all_dysfunction_frequencies(answers_url, api_url)
+    sum_team = team["av_weight"].sum()
+    sum_pos = pos["av_weight"].sum()
+    difference = sum_pos - sum_team
+    overall_h = round(100 - (100 * difference / sum_pos), 1)
+    return overall_h
 
 st.title("Générer les resultats de ma campagne")
 
@@ -1004,56 +1015,56 @@ if campaign:
         most_top5_dframe.rename(columns={"dysfunction":"dysfonctionnement", "people detected":"nombre de personne qui ont identifié ce dysfonctionnement"},inplace=True)
         st.dataframe(data=most_top5_dframe[~most_top5_dframe["dysfonctionnement"].isin(top_5_list)])
 
-    st.header("La santé de l'équipe")
-    st.write("La *santé* de l'équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
-    st.write("Pour voire comme l'équipe se composte par rapport aux autres dans son secteur d'activité, cf le Chapitre 'Positionnement' dans le guide du management.")
+    # st.header("La santé des équipes")
+    # st.write("La *santé* d'une équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
+    # st.write("Pour voire comme l'équipe se composte par rapport aux autres dans son secteur d'activité, cf le Chapitre 'Positionnement' dans le guide du management.")
 
-    #calculate health
-    pos = all_positives(answers_url, api_url)
-    team = all_dysfunction_frequencies(answers_url, api_url)
-    sum_team = team["av_weight"].sum()
-    sum_pos = pos["av_weight"].sum()
-    difference = sum_pos - sum_team
-    overall_h = round(100-(100*difference/sum_pos), 1)
+    # #calculate health
+    # pos = all_positives(answers_url, api_url)
+    # team = all_dysfunction_frequencies(answers_url, api_url)
+    # sum_team = team["av_weight"].sum()
+    # sum_pos = pos["av_weight"].sum()
+    # difference = sum_pos - sum_team
+    # overall_h = round(100-(100*difference/sum_pos), 1)
     
 
-    #gauge figure
-    if 45 <= overall_h <=75:
-        barcolor = "#FAD02C"
-    elif overall_h > 75:
-        barcolor = "#76B947"
-    elif overall_h < 45:
-        barcolor = "#DF362D"
+    # #gauge figure
+    # if 45 <= overall_h <=60:
+    #     barcolor = "#FAD02C"
+    # elif overall_h > 60:
+    #     barcolor = "#76B947"
+    # elif overall_h < 45:
+    #     barcolor = "#DF362D"
 
-    gradient_steps = [
-        {'range': [0, 20], 'color': '#D10000'},  # Red
-        {'range': [20, 40], 'color': '#F37F1D'},  # Orange
-        {'range': [40, 60], 'color': '#FFFF8A'},  # Yellow
-        {'range': [60, 80], 'color': '#7ED957'},  # Light Green
-        {'range': [80, 100], 'color': '#008000'}]  # Green
+    # gradient_steps = [
+    #     {'range': [0, 20], 'color': '#D10000'},  # Red
+    #     {'range': [20, 40], 'color': '#F37F1D'},  # Orange
+    #     {'range': [40, 60], 'color': '#FFFF8A'},  # Yellow
+    #     {'range': [60, 80], 'color': '#7ED957'},  # Light Green
+    #     {'range': [80, 100], 'color': '#008000'}]  # Green
 
-    go_fig = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=overall_h,
-        domain={'x': [0, 1], 'y': [0, 1]},
-        title={'text': "La santé de l'équipe", 'font': {'size': 24}},
-        gauge={
-            'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-            'bar': {'color': barcolor},  # Make bar transparent to show steps as a gradient
-            'bgcolor': "white",
-            'borderwidth': 2,
-            'bordercolor': "gray",
-            'steps': gradient_steps,  # Apply the gradient colors
-            'threshold': {
-                'line': {'color': "green", 'width': 4},
-                'thickness': 0.75,
-                'value': 95}}))
+    # go_fig = go.Figure(go.Indicator(
+    #     mode="gauge+number",
+    #     value=overall_h,
+    #     domain={'x': [0.2, 1], 'y': [0, 1]},
+    #     title={'text': "La santé de l'équipe", 'font': {'size': 24}},
+    #     gauge={
+    #         'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+    #         'bar': {'color': barcolor},  # Make bar transparent to show steps as a gradient
+    #         'bgcolor': "white",
+    #         'borderwidth': 2,
+    #         'bordercolor': "gray",
+    #         'steps': gradient_steps,  # Apply the gradient colors
+    #         'threshold': {
+    #             'line': {'color': "green", 'width': 4},
+    #             'thickness': 0.75,
+    #             'value': 95}}))
 
-    go_fig.update_layout(paper_bgcolor="black", font={'color': "white", 'family': "Arial"})
+    # go_fig.update_layout(paper_bgcolor="black", font={'color': "white", 'family': "Arial"})
 
-    st.plotly_chart(go_fig)
+    # st.plotly_chart(go_fig)
 
-    st.write(f"La santé de votre équipe est à {math.ceil(overall_h)}%")
+    # st.write(f"La santé de votre équipe est à {math.ceil(overall_h)}%")
 
     st.header("Vision Globale")
     everyone = augmented_map_dysfunctions(answers_url, api_url)
@@ -1153,8 +1164,66 @@ user_ids = st.secrets["user_ids"]
 
 if identifiant_argios == user_ids[0]:
     campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [35,36,37,38])
+    st.write(f"Les campagnes choisis : {campaign_nums}")
     if campaign_nums:
-        st.write(f"Les campagnes choisis : {campaign_nums}")
+        st.header("La santé des équipes")
+        st.write("La *santé* d'une équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
+        st.write("Pour voir comment l'équipe se positionne par rapport aux autres dans son secteur d'activité, cf. le Chapitre 'Positionnement' dans le guide du management.")
+
+        overall_teams = []
+        # List of answer URLs for demonstration
+        for num in campaign_nums:
+            overall_teams.append((f"Équipe {num}", f'{answers_prefix}/{num}'))
+
+        # Gradient and color thresholds (shared across all gauges)
+        gradient_steps = [
+            {'range': [0, 20], 'color': '#D10000'},  # Red
+            {'range': [20, 40], 'color': '#F37F1D'},  # Orange
+            {'range': [40, 60], 'color': '#FFFF8A'},  # Yellow
+            {'range': [60, 80], 'color': '#7ED957'},  # Light Green
+            {'range': [80, 100], 'color': '#008000'}  # Green
+        ]
+
+        # Loop through each team and display its gauge
+        for team_name, team_url in overall_teams:
+            # Compute health
+            overall_h = compute_health(team_url, api_url)
+
+            # Assign color based on health
+            if 45 <= overall_h <= 60:
+                barcolor = "#FAD02C"
+            elif overall_h > 60:
+                barcolor = "#76B947"
+            else:
+                barcolor = "#DF362D"
+
+            # Gauge figure
+            go_fig = go.Figure(go.Indicator(
+                mode="gauge+number",
+                value=overall_h,
+                domain={'x': [0.2, 1], 'y': [0, 1]},
+                title={'text': f"Santé de : {team_name}", 'font': {'size': 20}},
+                gauge={
+                    'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                    'bar': {'color': barcolor},
+                    'bgcolor': "white",
+                    'borderwidth': 2,
+                    'bordercolor': "gray",
+                    'steps': gradient_steps,
+                    'threshold': {
+                        'line': {'color': "green", 'width': 4},
+                        'thickness': 0.75,
+                        'value': 95
+                    }
+                }
+            ))
+
+            go_fig.update_layout(paper_bgcolor="black", font={'color': "white", 'family': "Arial"})
+
+            # Display chart
+            st.plotly_chart(go_fig)
+            st.write(f"La santé de `{team_name}` est à {math.ceil(overall_h)}%")
+
 
         st.header("L'ensemble des dysfonctionnements détectes")
         st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
