@@ -1162,150 +1162,98 @@ st.write(f"votre identifiant Argios : {identifiant_argios}")
 
 user_ids = st.secrets["user_ids"]
 
+campaign_nums = []
+
 if identifiant_argios == user_ids[0]:
     campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [35,36,37,38])
     st.write(f"Les campagnes choisis : {campaign_nums}")
-    if campaign_nums:
-        st.header("La santé des équipes")
-        st.write("La *santé* d'une équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
-        st.write("Pour voir comment l'équipe se positionne par rapport aux autres dans son secteur d'activité, cf. le Chapitre 'Positionnement' dans le guide du management.")
-
-        overall_teams = []
-        # List of answer URLs for demonstration
-        for num in campaign_nums:
-            overall_teams.append((f"Équipe {num}", f'{answers_prefix}/{num}'))
-
-        # Gradient and color thresholds (shared across all gauges)
-        gradient_steps = [
-            {'range': [0, 20], 'color': '#D10000'},  # Red
-            {'range': [20, 40], 'color': '#F37F1D'},  # Orange
-            {'range': [40, 60], 'color': '#FFFF8A'},  # Yellow
-            {'range': [60, 80], 'color': '#7ED957'},  # Light Green
-            {'range': [80, 100], 'color': '#008000'}  # Green
-        ]
-
-        # Loop through each team and display its gauge
-        for team_name, team_url in overall_teams:
-            # Compute health
-            overall_h = compute_health(team_url, api_url)
-
-            # Assign color based on health
-            if 45 <= overall_h <= 60:
-                barcolor = "#FAD02C"
-            elif overall_h > 60:
-                barcolor = "#76B947"
-            else:
-                barcolor = "#DF362D"
-
-            # Gauge figure
-            go_fig = go.Figure(go.Indicator(
-                mode="gauge+number",
-                value=overall_h,
-                domain={'x': [0.2, 1], 'y': [0, 1]},
-                title={'text': f"Santé de : {team_name}", 'font': {'size': 20}},
-                gauge={
-                    'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-                    'bar': {'color': barcolor},
-                    'bgcolor': "white",
-                    'borderwidth': 2,
-                    'bordercolor': "gray",
-                    'steps': gradient_steps,
-                    'threshold': {
-                        'line': {'color': "green", 'width': 4},
-                        'thickness': 0.75,
-                        'value': 95
-                    }
-                }
-            ))
-
-            go_fig.update_layout(paper_bgcolor="black", font={'color': "white", 'family': "Arial"})
-
-            # Display chart
-            st.plotly_chart(go_fig)
-            st.write(f"La santé de `{team_name}` est à {math.ceil(overall_h)}%")
-
-
-        st.header("L'ensemble des dysfonctionnements détectes")
-        st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
-        all_people = all_merged(campaign_nums, api_url)
-        fig_all, ax_all = plt.subplots(figsize=(10,10))
-        sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
-        plt.tight_layout()
-        st.pyplot(fig_all)
-        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
-
-        st.header("L'ensemble des principaux dysfonctionnements détectes")
-        st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
-        
-        multi_top5 = teams_top5_merged(campaign_nums, api_url)
-        fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
-        sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
-        plt.tight_layout()
-        col1, _ = st.columns([2,1])
-        with col1:
-            st.pyplot(fig_top5)
-        st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
-        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
-    else:
-        st.write("Veuillez choisir les numéros de campagne pour commencer.")
-
 if identifiant_argios == user_ids[1]:
     campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [15, 18, 40])
-    if campaign_nums:
-        st.write(f"Les campagnes choisis : {campaign_nums}")
-
-        st.header("L'ensemble des dysfonctionnements détectes")
-        st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
-        all_people = all_merged(campaign_nums, api_url)
-        fig_all, ax_all = plt.subplots(figsize=(10,10))
-        sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
-        plt.tight_layout()
-        st.pyplot(fig_all)
-        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
-
-        st.header("L'ensemble des principaux dysfonctionnements détectes")
-        st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
-        
-        multi_top5 = teams_top5_merged(campaign_nums, api_url)
-        fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
-        sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
-        plt.tight_layout()
-        col1, _ = st.columns([2,1])
-        with col1:
-            st.pyplot(fig_top5)
-        st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
-        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
-    else:
-        st.write("Veuillez choisir les numéros de campagne pour commencer.")
-
+    st.write(f"Les campagnes choisis : {campaign_nums}")
 if identifiant_argios == user_ids[2] or identifiant_argios == user_ids[3]:
     campaign_nums = st.multiselect("Choisissez les campagnes à inclure", [14, 15, 17, 18, 33, 35, 36, 37, 38, 40])
-    if campaign_nums:
-        st.write(f"Les campagnes choisis : {campaign_nums}")
+    st.write(f"Les campagnes choisis : {campaign_nums}")
 
-        st.header("L'ensemble des dysfonctionnements détectes")
-        st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
-        all_people = all_merged(campaign_nums, api_url)
-        fig_all, ax_all = plt.subplots(figsize=(10,10))
-        sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
-        plt.tight_layout()
-        st.pyplot(fig_all)
-        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+if len(campaign_nums) != 0:
+    st.header("La santé des équipes")
+    st.write("La *santé* d'une équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
+    st.write("Pour voir comment l'équipe se positionne par rapport aux autres dans son secteur d'activité, cf. le Chapitre 'Positionnement' dans le guide du management.")
 
-        st.header("L'ensemble des principaux dysfonctionnements détectes")
-        st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
-        
-        multi_top5 = teams_top5_merged(campaign_nums, api_url)
-        fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
-        sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
-        plt.tight_layout()
-        col1, _ = st.columns([2,1])
-        with col1:
-            st.pyplot(fig_top5)
-        st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
-        st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
-    else:
-        st.write("Veuillez choisir les numéros de campagne pour commencer.")
+    overall_teams = []
+    # List of answer URLs for demonstration
+    for num in campaign_nums:
+        overall_teams.append((f"Équipe {num}", f'{answers_prefix}/{num}'))
+
+    # Gradient and color thresholds (shared across all gauges)
+    gradient_steps = [
+        {'range': [0, 20], 'color': '#D10000'},  # Red
+        {'range': [20, 40], 'color': '#F37F1D'},  # Orange
+        {'range': [40, 60], 'color': '#FFFF8A'},  # Yellow
+        {'range': [60, 80], 'color': '#7ED957'},  # Light Green
+        {'range': [80, 100], 'color': '#008000'}  # Green
+        ]
+
+    # Loop through each team and display its gauge
+    for team_name, team_url in overall_teams:
+        # Compute health
+        overall_h = compute_health(team_url, api_url)
+
+        # Assign color based on health
+        if 45 <= overall_h <= 60:
+            barcolor = "#FAD02C"
+        elif overall_h > 60:
+            barcolor = "#76B947"
+        else:
+            barcolor = "#DF362D"
+
+        # Gauge figure
+        go_fig = go.Figure(go.Indicator(
+            mode="gauge+number",
+            value=overall_h,
+            domain={'x': [0.2, 1], 'y': [0, 1]},
+            title={'text': f"Santé de : {team_name}", 'font': {'size': 20}},
+            gauge={
+                'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
+                'bar': {'color': barcolor},
+                'bgcolor': "white",
+                'borderwidth': 2,
+                'bordercolor': "gray",
+                'steps': gradient_steps,
+                'threshold': {
+                    'line': {'color': "green", 'width': 4},
+                    'thickness': 0.75,
+                    'value': 95}}
+                    ))
+
+        go_fig.update_layout(paper_bgcolor="black", font={'color': "white", 'family': "Arial"})
+
+        # Display chart
+        st.plotly_chart(go_fig)
+        st.write(f"La santé de `{team_name}` est à {math.ceil(overall_h)}%")
+
+
+    st.header("L'ensemble des dysfonctionnements détectes")
+    st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
+    all_people = all_merged(campaign_nums, api_url)
+    fig_all, ax_all = plt.subplots(figsize=(10,10))
+    sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
+    plt.tight_layout()
+    st.pyplot(fig_all)
+    st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+
+    st.header("L'ensemble des principaux dysfonctionnements détectes")
+    st.write("Voici les principaux dysfonctionnemetns détectés par campagne :")
+    st.write("Plus le rectangle est violet foncé, plus le dysfonctionnement est impactant d'après la dysfonctiothèque.")
+    st.write("Chaque colonne correspond à une équipe (exemple : c_XX, c'est l'équipe répondant à la campagne numéro XX).")
+    multi_top5 = teams_top5_merged(campaign_nums, api_url)
+    fig_top5, ax_top5 = plt.subplots(figsize=(10,10))
+    sns.heatmap(multi_top5, annot=False, linewidths=.5, ax=ax_top5, xticklabels=True, cbar=False, cmap="BuPu")
+    plt.tight_layout()
+    col1, _ = st.columns([2,1])
+    with col1:
+        st.pyplot(fig_top5)
+else:
+    st.write("Veuillez choisir les numéros de campagne pour commencer.")
 
 if identifiant_argios not in user_ids:
     st.write("Veuillez entrer un identifiant valide.")
