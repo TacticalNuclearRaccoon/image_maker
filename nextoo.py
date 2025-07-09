@@ -31,7 +31,8 @@ import math
 ########## FUNCTIONS ##########
 ###############################
  
-st.set_page_config(layout='wide', page_icon=':octopus:')
+icon = "Favicon_2x.ico"
+st.set_page_config(layout='wide', page_icon=icon, page_title="outil d'analyse ARGIOS")
 
 def aggrid_interactive_table(df: pd.DataFrame):
     """Creates an st-aggrid interactive table based on a dataframe.
@@ -962,6 +963,11 @@ def compute_health(answers_url, api_url):
     difference = sum_pos - sum_team
     overall_h = round(100 - (100 * difference / sum_pos), 1)
     return overall_h
+
+try:
+    st.image('Banniere argios.svg', use_container_width=True)
+except:
+    st.image('Banniere argios.svg', use_column_width=True)
 
 st.title("Générer les resultats de ma campagne")
 
