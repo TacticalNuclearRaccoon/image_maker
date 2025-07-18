@@ -711,7 +711,6 @@ def points_forts(answers_url, api_url):
 
     # Filter out the people who turbo-clicked
     unfiltered_data = [item for item in all_data]
-
     data = [respondent for respondent in unfiltered_data if len(set(ans["answer"] for ans in respondent["answers"])) > 1]
 
     # Fetch themes and planets data
@@ -743,6 +742,7 @@ def points_forts(answers_url, api_url):
             for dysfunction in family.get('dysfunctions', []):
                 for question in dysfunction.get('questions', []):
                     question_id = question['id']
+                    question_label = question['label']
                     matching_answer = next((item for item in answers if item['questionId'] == question_id), None)
 
                     if matching_answer:
@@ -750,7 +750,8 @@ def points_forts(answers_url, api_url):
                         if user_answer not in question.get('responseTrigger', []):
                             results.append({
                                 'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
-                                'weight': dysfunction.get('weight', 0)
+                                'weight': dysfunction.get('weight', 0),
+                                "points forts" : dysfunction.get('questions')[0].get('label', 'No Label')
                             })
 
         # Create a DataFrame for the current response
@@ -767,7 +768,6 @@ def points_forts(answers_url, api_url):
     result1 = data_merge.sort_values(by='weight', ascending=False)
     result1.reset_index(drop=True, inplace=True)
     result3 = result1[~result1['dysfunction'].isin(diagnosed)]
-    result3.rename(columns={"dysfunction":"dysfonctionnement"}, inplace=True)
 
     return result3
 
@@ -969,7 +969,7 @@ try:
 except:
     st.image('Banniere argios.svg', use_column_width=True)
 
-st.title("Générer les resultats de ma campagne")
+st.title("Générateur du e-diagnostic for IT Teams")
 
 # input paths
 
@@ -978,7 +978,7 @@ assets = os.path.join(here, 'assets')
 #st.write(f'assets files fetched from: {assets}')
 #st.write(f'output files and report saved to: {results_folder}')
 
-single = st.checkbox("Cocher si cet e-diag ne concerne qu'un seule répondant ('Ecart des réponses', 'Cas en marge' et 'points de désaccord' ne seront pas générés).")
+single = st.checkbox("Cochez cette case s'il n'y a qu'une seule personne qui a répondu au questionnaire", value=False)
 if single:
     st.write("Une seule personne a répondu. 'L'écart des réponses', 'Les cas à la marge' et 'Les points de désaccord' non disponibles.")
 
@@ -988,19 +988,19 @@ form_theme = 'Collaborer en Équipe'
 api_url = st.secrets["api_url"]
 thematics = 'team'
 
-campaign = st.text_input("Entrez le id de la campagne (de type : XX) :")
+campaign = st.text_input("Entrez l'identifiant du e-diagnostic (de type : XX) :")
 
 answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
 
 if campaign:
-    st.header("Mes points forts")
-    st.write("Voici les dysfonctionnements qui N'ONT PAS été identifiés")
+    st.header("Les points forts de l'équipe")
+    st.write("Classés du plus impactant au moins impactant")
     atouts = points_forts(answers_url, api_url)
-    atouts.drop(columns=["weight"],inplace=True)
+    atouts.drop(columns=["weight", "dysfunction"],inplace=True)
     st.dataframe(data=atouts.head(5))
 
-    st.header("Mes principaux dysfonctionnements")
+    st.header("Les principaux dysfonctionnements")
     top5 = dysfunction_frequencies(answers_url, api_url)
     top5_dframe = top5.drop(columns=["av_weight"])
     top5_dframe.rename(columns={"dysfunction":"dysfonctionnement"},inplace=True)
@@ -1153,13 +1153,17 @@ if campaign:
 
     st.header("Les solutions proposées")
     solutions = get_all_solutions(assets, answers_url, api_url)
-    selection = aggrid_interactive_table(df=solutions)
-    filtered_solutions = selection['selected_rows']
-    st.write("Les solutions séléctionnées:")
-    st.dataframe(data=filtered_solutions)
+    solutions_to_show = solutions[solutions['dysfunction'].isin(top_5_list)]
+    if solutions_to_show.empty:
+        st.write("Veuillez sélectionner des dysfonctionnements pour voir les solutions.")
+    else:
+        selection = aggrid_interactive_table(df=solutions_to_show)
+        filtered_solutions = selection['selected_rows']
+        st.write("Les solutions séléctionnées:")
+        st.dataframe(data=filtered_solutions)
 
 else:
-    st.write("Veuillez renseigner le 'id' de campagne (fourni par Argios) 😉 et appuyez [Enter] ↪️ pour commencer")
+    st.write("Après avoir renseigné l'identifiant, appuyez sur [Enter] ↪️ pour commencer")
 
 st.header("Je veux comparer plusieurs équipes")
 
@@ -1183,7 +1187,8 @@ if identifiant_argios == user_ids[2] or identifiant_argios == user_ids[3]:
 if len(campaign_nums) != 0:
     st.header("La santé des équipes")
     st.write("La *santé* d'une équipe compare celle-ci à une équipe fictive qui présenterait tous les dysfonctionnements. Plus la *santé* est élevé mieux c'est 😉")
-    st.write("Pour voir comment l'équipe se positionne par rapport aux autres dans son secteur d'activité, cf. le Chapitre 'Positionnement' dans le guide du management.")
+    st.write("Argios considère qu'une équipe est en bonne santé avec un score au-delà de 60%")
+    #st.write("Pour voir comment l'équipe se positionne par rapport aux autres dans son secteur d'activité, cf. le Chapitre 'Positionnement' dans le guide du management.")
 
     overall_teams = []
     # List of answer URLs for demonstration
@@ -1239,7 +1244,7 @@ if len(campaign_nums) != 0:
 
 
     st.header("L'ensemble des dysfonctionnements détectes")
-    st.write("Voici les dysfonctionnemetns détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
+    st.write("Voici les dysfonctionnements détectés par campagne. Les numéros dans les cases indiquent le nombre de personnes qui ont détectés le dysfonctionnement")
     all_people = all_merged(campaign_nums, api_url)
     fig_all, ax_all = plt.subplots(figsize=(10,10))
     sns.heatmap(all_people, annot=True, linewidths=.5, ax=ax_all, xticklabels=True, cbar=False, cmap="BuPu")
