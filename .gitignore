@@ -2,6 +2,9 @@
 *.tar
 *.zip
 
+# secrets
+.streamlit/secrets.toml
+
 # Byte-compiled / optimized / DLL files
 __pycache__/
 *.py[cod]
@@ -167,3 +170,10 @@ cython_debug/
 
 # stupid MacOS stuff
 .DS_Store
+
+#assets for the maker
+/maker_assets
+
+#maker file
+maker.py
+/results
