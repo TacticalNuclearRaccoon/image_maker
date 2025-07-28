@@ -742,7 +742,6 @@ def points_forts(answers_url, api_url):
             for dysfunction in family.get('dysfunctions', []):
                 for question in dysfunction.get('questions', []):
                     question_id = question['id']
-                    question_label = question['label']
                     matching_answer = next((item for item in answers if item['questionId'] == question_id), None)
 
                     if matching_answer:
@@ -751,7 +750,6 @@ def points_forts(answers_url, api_url):
                             results.append({
                                 'dysfunction': dysfunction.get('label', 'Unknown Dysfunction'),
                                 'weight': dysfunction.get('weight', 0),
-                                "points forts" : dysfunction.get('questions')[0].get('label', 'No Label')
                             })
 
         # Create a DataFrame for the current response
@@ -768,6 +766,7 @@ def points_forts(answers_url, api_url):
     result1 = data_merge.sort_values(by='weight', ascending=False)
     result1.reset_index(drop=True, inplace=True)
     result3 = result1[~result1['dysfunction'].isin(diagnosed)]
+    result3.rename(columns={"dysfunction":"dysfonctionnement"}, inplace=True)
 
     return result3
 
@@ -994,10 +993,10 @@ answers_prefix = st.secrets["answers_prefix"]
 answers_url = f'{answers_prefix}/{campaign}'
 
 if campaign:
-    st.header("Les points forts de l'équipe")
-    st.write("Classés du plus impactant au moins impactant")
+    st.header("Les points forts de l'équipe / Les dysfonctionnements non-identifiés")
+    st.write("Voici les dysfonctionnements qui N'ONT PAS été identifiés :")
     atouts = points_forts(answers_url, api_url)
-    atouts.drop(columns=["weight", "dysfunction"],inplace=True)
+    atouts.drop(columns=["weight"],inplace=True)
     st.dataframe(data=atouts.head(5))
 
     st.header("Les principaux dysfonctionnements")
