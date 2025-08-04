@@ -26,6 +26,7 @@ from st_aggrid.shared import GridUpdateMode
 #from itertools import count
 import plotly.graph_objects as go
 import math
+import bcrypt
 
 ###############################
 ########## FUNCTIONS ##########
@@ -952,6 +953,39 @@ def average_family_scores(answers_url, api_url):
 ##################################    
 ###### USER INTERFACE ############
 ##################################
+
+# --- AUTHENTICATION LOGIC ---
+if 'authenticated' not in st.session_state:
+    st.session_state['authenticated'] = False
+if 'username' not in st.session_state:
+    st.session_state['username'] = ''
+
+users = st.secrets.get('users', {})
+
+def login_form():
+    st.title('Connexion requise')
+    with st.form('login_form'):
+        username = st.text_input('Nom d\'utilisateur')
+        password = st.text_input('Mot de passe', type='password')
+        submit = st.form_submit_button('Se connecter')
+        if submit:
+            if username in users:
+                hashed = users[username].encode()
+                if bcrypt.checkpw(password.encode(), hashed):
+                    st.session_state['authenticated'] = True
+                    st.session_state['username'] = username
+                    st.success('Connecté avec succès !')
+                    st.write(f'Bienvenue, {username}!')
+                    st.rerun()
+                else:
+                    st.error('Nom d\'utilisateur ou mot de passe incorrect.')
+            else:
+                st.error('Nom d\'utilisateur ou mot de passe incorrect.')
+
+if not st.session_state['authenticated']:
+    login_form()
+    st.stop()
+# --- END AUTHENTICATION LOGIC ---
 
 @st.cache_data
 def compute_health(answers_url, api_url):
